@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eisenhower Matrix - Mentimeter Clone</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            
+            /* Quadrant Colors */
+            --q1: #84cc16; /* Olive/Lime Green */
+            --q2: #a855f7; /* Purple */
+            --q3: #f97316; /* Orange */
+            --q4: #14b8a6; /* Teal */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Landing / Mode Selection */
+        #mode-select-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .mode-card-container {
+            display: flex;
+            gap: 2rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .mode-card {
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            padding: 2.5rem;
+            border-radius: 1rem;
+            width: 280px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+        }
+
+        .mode-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4);
+        }
+
+        .mode-card h2 {
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .mode-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* App Layout */
+        .app-container {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .session-code {
+            background: #312e81;
+            color: #818cf8;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            gap: 2rem;
+        }
+
+        /* Host Layout Split */
+        .host-content {
+            display: flex;
+            flex: 1;
+            gap: 2rem;
+            height: calc(100vh - 140px);
+        }
+
+        .presentation-area {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            background: var(--card-bg);
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+        }
+
+        .participants-sidebar {
+            flex: 1;
+            background: var(--card-bg);
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+            max-height: 100%;
+            overflow-y: auto;
+        }
+
+        .slide-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--text-main);
+            text-align: center;
+            background: #0f172a;
+            padding: 1.25rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+        }
+
+        .chart-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            max-height: 380px;
+        }
+
+        .host-controls {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Participant Grid Sidebar */
+        .participant-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            overflow-y: auto;
+        }
+
+        .participant-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #0f172a;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .participant-avatar {
+            font-size: 1.25rem;
+            background: #312e81;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        /* Participant View Styles */
+        .participant-screen {
+            flex-direction: column;
+            max-width: 600px;
+            margin: auto;
+            justify-content: center;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+            width: 100%;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: #475569;
+            width: auto;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #334155;
+        }
+
+        .btn-success {
+            background-color: #059669;
+            width: auto;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #047857;
+        }
+
+        /* 4 Quadrants Grid Layout for Participants */
+        .quadrants-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .quadrant-btn {
+            border: none;
+            padding: 1.5rem 1rem;
+            border-radius: 0.75rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #1e293b;
+            cursor: pointer;
+            transition: transform 0.2s, filter 0.2s;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+        }
+
+        .quadrant-btn:hover {
+            transform: scale(1.03);
+            filter: brightness(1.1);
+        }
+
+        .q1-btn { background-color: var(--q1); }
+        .q2-btn { background-color: var(--q2); color: white; }
+        .q3-btn { background-color: var(--q3); color: white; }
+        .q4-btn { background-color: var(--q4); color: white; }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 0.75rem;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            margin-top: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Avatar Selection Grid */
+        .avatar-picker {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .avatar-option {
+            background: #0f172a;
+            border: 2px solid var(--border);
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .avatar-option.selected {
+            border-color: var(--primary);
+            background: #312e81;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Landing Screen -->
+    <div id="mode-select-screen">
+        <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem; color: var(--primary);">Eisenhower Matrix Live Polls</h1>
+        <p style="color: var(--text-muted); font-size: 1.1rem;">Choose your mode to start presenting or participating</p>
+        <div class="mode-card-container">
+            <div class="mode-card" onclick="initApp('host')">
+                <h2>🖥️ Host View</h2>
+                <p>Present matrix scenarios, track live quadrant votes, and monitor participants.</p>
+            </div>
+            <div class="mode-card" onclick="initApp('participant')">
+                <h2>📱 Participant View</h2>
+                <p>Join code #482910, select your avatar, and categorize tasks into 4 quadrants.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Host App Layout -->
+    <div id="host-app" class="app-container">
+        <header>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <h2>Matrix Host Dashboard</h2>
+                <span class="session-code">Join Code: #482910</span>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <button class="btn btn-success" onclick="exportToCSV()">📥 Download CSV</button>
+            </div>
+        </header>
+        <main>
+            <div class="host-content">
+                <div class="presentation-area">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <span id="slide-type-badge" style="font-size: 0.85rem; font-weight: bold; text-transform: uppercase; background: #312e81; color: #818cf8; padding: 0.25rem 0.75rem; border-radius: 1rem;">Eisenhower Matrix Task</span>
+                        <span id="slide-counter" style="color: var(--text-muted); font-weight: 500;">Slide 1 of 35</span>
+                    </div>
+                    <h2 id="host-slide-title" class="slide-title">Loading scenario...</h2>
+                    <div class="chart-container" id="host-chart-area"></div>
+                    <div class="host-controls">
+                        <button class="btn btn-secondary" onclick="prevSlide()">Previous Task</button>
+                        <button class="btn btn-secondary" onclick="nextSlide()" style="background-color: var(--primary); color: white;">Next Task</button>
+                    </div>
+                </div>
+                <div class="participants-sidebar">
+                    <h3 style="font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;" id="participant-count-header">👥 Participants (0)</h3>
+                    <div class="participant-grid" id="host-participant-list">
+                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1rem;">Waiting for participants to join...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Participant App Layout -->
+    <div id="participant-app" class="app-container">
+        <header>
+            <h2>Participant View</h2>
+            <span class="session-code">#482910</span>
+        </header>
+        <main style="justify-content: center; align-items: center;">
+            <div class="card" id="participant-card">
+                <!-- Registration / Quadrants Form -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Generated list of slides covering all provided tasks mapped to the 4 Quadrants
+        const slides = [
+            // --- QUADRANT 1 TASKS ---
+            { id: 1, title: 'Responding to a customer escalation / Responding to high-priority customer email', votes: [0, 0, 0, 0] },
+            { id: 2, title: 'Joining an emergency customer call / Prioritizing customer-facing commitments', votes: [0, 0, 0, 0] },
+            { id: 3, title: 'Supporting sales team query during a technical bid evaluation meeting', votes: [0, 0, 0, 0] },
+            { id: 4, title: 'Responding to e-mail from leadership team', votes: [0, 0, 0, 0] },
+            { id: 5, title: 'Addressing shipment delay concerns from logistics team', votes: [0, 0, 0, 0] },
+            { id: 6, title: 'Supporting a teammate during workload crisis', votes: [0, 0, 0, 0] },
+            { id: 7, title: 'Acknowledging project submission delays', votes: [0, 0, 0, 0] },
+            { id: 8, title: 'Supporting new team members during customer escalations', votes: [0, 0, 0, 0] },
+            { id: 9, title: 'Clarifying urgent action items after the meeting / Minutes of meetings', votes: [0, 0, 0, 0] },
+            { id: 10, title: 'Raise NOI for next week’s inspection', votes: [0, 0, 0, 0] },
+            { id: 11, title: 'Supporting factory troubleshooting during critical assembly issues', votes: [0, 0, 0, 0] },
+            { id: 12, title: 'Solving ERP/BOM errors blocking manufacturing activities', votes: [0, 0, 0, 0] },
+            { id: 13, title: 'Arranging urgent dispatch clearance for committed shipments', votes: [0, 0, 0, 0] },
+            { id: 14, title: 'Acting on critical NCRs affecting dispatch approval', votes: [0, 0, 0, 0] },
+
+            // --- QUADRANT 2 TASKS ---
+            { id: 15, title: 'Improving communication skills / Improving presentation skills / Developing conflict resolution skills', votes: [0, 0, 0, 0] },
+            { id: 16, title: 'Mentoring junior employees', votes: [0, 0, 0, 0] },
+            { id: 17, title: 'Update workload in common share point or Tools', votes: [0, 0, 0, 0] },
+            { id: 18, title: 'Communications from C-suite’s', votes: [0, 0, 0, 0] },
+            { id: 19, title: 'IDP discussion with management', votes: [0, 0, 0, 0] },
+            { id: 20, title: 'Complete assigned LDP courses on Emerson Learn', votes: [0, 0, 0, 0] },
+            { id: 21, title: 'Preparing contents for knowledge-sharing sessions', votes: [0, 0, 0, 0] },
+            { id: 22, title: 'Participating in Transform Initiatives', votes: [0, 0, 0, 0] },
+            { id: 23, title: 'Analyzing past project issues to prevent future recurrence', votes: [0, 0, 0, 0] },
+            { id: 24, title: 'Working on automation ideas for repetitive tasks', votes: [0, 0, 0, 0] },
+
+            // --- QUADRANT 3 TASKS ---
+            { id: 25, title: 'Scheduling routine meetings', votes: [0, 0, 0, 0] },
+            { id: 26, title: 'Attending meetings where you are an optional invite / minimal contribution', votes: [0, 0, 0, 0] },
+            { id: 27, title: 'Participating in ERG activities', votes: [0, 0, 0, 0] },
+            { id: 28, title: 'Responding instantly for all Teams notification', votes: [0, 0, 0, 0] },
+            { id: 29, title: 'Interruptions from colleagues asking for info already available in shared folders', votes: [0, 0, 0, 0] },
+            { id: 30, title: 'Spending time on cosmetic Excel formatting instead of data accuracy', votes: [0, 0, 0, 0] },
+
+            // --- QUADRANT 4 TASKS ---
+            { id: 31, title: 'Scrolling LinkedIn feeds without learning or engagement purpose during office hours', votes: [0, 0, 0, 0] },
+            { id: 32, title: 'Spending excessive time on office gossip', votes: [0, 0, 0, 0] },
+            { id: 33, title: 'Repeatedly checking mobile notifications without importance', votes: [0, 0, 0, 0] },
+            { id: 34, title: 'Organizing desktop icons instead of completing tasks', votes: [0, 0, 0, 0] },
+            { id: 35, title: 'Attending casual discussions unrelated to work objectives / Watching cricket highlights', votes: [0, 0, 0, 0] }
+        ];
+
+        let currentSlideIndex = 0;
+        let userRole = null;
+        let myVoteSubmitted = false;
+        let chartInstance = null;
+        
+        let participantId = 'user_' + Math.random().toString(36).substring(2, 9);
+        let participantName = '';
+        let participantAvatar = '🦊';
+        let isRegistered = false;
+
+        const channel = new BroadcastChannel('mentimeter_sync_channel');
+        let connectedParticipants = {};
+
+        const quadrantLabels = [
+            'Q1: Urgent + Important ("DO NOW")',
+            'Q2: Important + Not Urgent ("SCHEDULE")',
+            'Q3: Urgent + Not Important ("DELEGATE")',
+            'Q4: Not Urgent + Not Important ("ELIMINATE")'
+        ];
+
+        const quadrantColors = ['#84cc16', '#a855f7', '#f97316', '#14b8a6'];
+
+        function initApp(role) {
+            userRole = role;
+            document.getElementById('mode-select-screen').style.display = 'none';
+            
+            if (role === 'host') {
+                document.getElementById('host-app').style.display = 'flex';
+                renderHostSlide();
+                renderHostParticipants();
+            } else {
+                document.getElementById('participant-app').style.display = 'flex';
+                renderParticipantView();
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            if (mode === 'host' || mode === 'participant') {
+                initApp(mode);
+            }
+        });
+
+        channel.onmessage = (event) => {
+            const data = event.data;
+            if (data.type === 'STATE_UPDATE') {
+                if (currentSlideIndex !== data.currentSlideIndex) {
+                    myVoteSubmitted = false;
+                }
+                currentSlideIndex = data.currentSlideIndex;
+                slides.splice(0, slides.length, ...data.slides);
+                
+                if (userRole === 'host') renderHostSlide();
+                if (userRole === 'participant' && isRegistered) renderParticipantView();
+            }
+            if (data.type === 'PARTICIPANT_REGISTERED') {
+                connectedParticipants[data.id] = { name: data.name, avatar: data.avatar };
+                if (userRole === 'host') renderHostParticipants();
+                broadcastParticipants();
+            }
+            if (data.type === 'PARTICIPANTS_SYNC' && userRole === 'host') {
+                connectedParticipants = data.participants;
+                renderHostParticipants();
+            }
+        };
+
+        function broadcastState() {
+            channel.postMessage({
+                type: 'STATE_UPDATE',
+                currentSlideIndex,
+                slides
+            });
+        }
+
+        function broadcastParticipants() {
+            channel.postMessage({
+                type: 'PARTICIPANTS_SYNC',
+                participants: connectedParticipants
+            });
+        }
+
+        // --- HOST LOGIC ---
+        function renderHostSlide() {
+            const slide = slides[currentSlideIndex];
+            document.getElementById('host-slide-title').innerText = `Task: "${slide.title}"`;
+            document.getElementById('slide-counter').innerText = `Slide ${currentSlideIndex + 1} of ${slides.length}`;
+
+            const chartArea = document.getElementById('host-chart-area');
+            chartArea.innerHTML = '';
+
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+
+            chartArea.innerHTML = `<canvas id="pollChart"></canvas>`;
+            const ctx = document.getElementById('pollChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: quadrantLabels,
+                    datasets: [{
+                        label: 'Votes',
+                        data: slide.votes,
+                        backgroundColor: quadrantColors,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { 
+                        y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94a3b8' }, grid: { color: '#334155' } },
+                        x: { ticks: { color: '#f8fafc', font: { weight: 'bold' } }, grid: { display: false } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderHostParticipants() {
+            const listContainer = document.getElementById('host-participant-list');
+            const entries = Object.values(connectedParticipants);
+            document.getElementById('participant-count-header').innerText = `👥 Participants (${entries.length})`;
+            
+            listContainer.innerHTML = '';
+            if (entries.length === 0) {
+                listContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1rem;">Waiting for participants to join...</p>`;
+                return;
+            }
+
+            entries.forEach(p => {
+                const chip = document.createElement('div');
+                chip.className = 'participant-chip';
+                chip.innerHTML = `
+                    <div class="participant-avatar">${p.avatar}</div>
+                    <span>${p.name}</span>
+                `;
+                listContainer.appendChild(chip);
+            });
+        }
+
+        function nextSlide() {
+            if (currentSlideIndex < slides.length - 1) {
+                currentSlideIndex++;
+                myVoteSubmitted = false;
+                renderHostSlide();
+                broadcastState();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                myVoteSubmitted = false;
+                renderHostSlide();
+                broadcastState();
+            }
+        }
+
+        // --- PARTICIPANT LOGIC ---
+        function renderParticipantView() {
+            const card = document.getElementById('participant-card');
+            card.innerHTML = '';
+
+            if (!isRegistered) {
+                card.innerHTML = `
+                    <h3 style="margin-bottom: 1rem;">Join Matrix Session</h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Choose your avatar and enter your name:</p>
+                    <div class="avatar-picker" id="avatar-picker">
+                        <div class="avatar-option selected" onclick="selectAvatar('🦊', this)">🦊</div>
+                        <div class="avatar-option" onclick="selectAvatar('🤖', this)">🤖</div>
+                        <div class="avatar-option" onclick="selectAvatar('🚀', this)">🚀</div>
+                        <div class="avatar-option" onclick="selectAvatar('🐱', this)">🐱</div>
+                        <div class="avatar-option" onclick="selectAvatar('🐼', this)">🐼</div>
+                        <div class="avatar-option" onclick="selectAvatar('🦄', this)">🦄</div>
+                        <div class="avatar-option" onclick="selectAvatar('⚡', this)">⚡</div>
+                        <div class="avatar-option" onclick="selectAvatar('🎯', this)">🎯</div>
+                    </div>
+                    <label style="font-size: 0.9rem; font-weight: 600;">Your Name</label>
+                    <input type="text" id="participant-name-input" placeholder="e.g. Lalith" />
+                    <button class="btn" onclick="registerParticipant()">Join Session</button>
+                `;
+                return;
+            }
+
+            const slide = slides[currentSlideIndex];
+            const title = document.createElement('h3');
+            title.innerText = `Classify this task:\n"${slide.title}"`;
+            title.style.marginBottom = '1.5rem';
+            title.style.fontSize = '1.1rem';
+            title.style.lineHeight = '1.4';
+            card.appendChild(title);
+
+            if (myVoteSubmitted) {
+                card.innerHTML += `<div style="text-align: center; padding: 2rem;"><h3 style="color: #10b981; margin-bottom: 0.5rem;">✅ Vote Recorded!</h3><p style="color: var(--text-muted);">Waiting for the host to go to the next task...</p></div>`;
+                return;
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'quadrants-grid';
+
+            const qNames = [
+                { text: 'QUADRANT 1\nUrgent + Important\n"DO NOW"', class: 'q1-btn', idx: 0 },
+                { text: 'QUADRANT 2\nImportant + Not Urgent\n"SCHEDULE"', class: 'q2-btn', idx: 1 },
+                { text: 'QUADRANT 3\nUrgent + Not Important\n"DELEGATE"', class: 'q3-btn', idx: 2 },
+                { text: 'QUADRANT 4\nNot Urgent + Not Important\n"ELIMINATE"', class: 'q4-btn', idx: 3 }
+            ];
+
+            qNames.forEach(q => {
+                const btn = document.createElement('button');
+                btn.className = `quadrant-btn ${q.class}`;
+                btn.style.whiteSpace = 'pre-line';
+                btn.innerText = q.text;
+                btn.onclick = () => {
+                    slide.votes[q.idx]++;
+                    myVoteSubmitted = true;
+                    broadcastState();
+                    renderParticipantView();
+                };
+                grid.appendChild(btn);
+            });
+
+            card.appendChild(grid);
+        }
+
+        function selectAvatar(emoji, element) {
+            document.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            participantAvatar = emoji;
+        }
+
+        function registerParticipant() {
+            const nameInput = document.getElementById('participant-name-input').value.trim();
+            if (!nameInput) {
+                alert('Please enter your name to join.');
+                return;
+            }
+            participantName = nameInput;
+            isRegistered = true;
+
+            connectedParticipants[participantId] = { name: participantName, avatar: participantAvatar };
+            channel.postMessage({
+                type: 'PARTICIPANT_REGISTERED',
+                id: participantId,
+                name: participantName,
+                avatar: participantAvatar
+            });
+
+            renderParticipantView();
+        }
+
+        function exportToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Task ID,Task Scenario,Q1 (Do Now),Q2 (Schedule),Q3 (Delegate),Q4 (Eliminate)\n";
+
+            slides.forEach(slide => {
+                csvContent += `"${slide.id}","${slide.title.replace(/"/g, '""')}","${slide.votes[0]}","${slide.votes[1]}","${slide.votes[2]}","${slide.votes[3]}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "eisenhower_matrix_results.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
