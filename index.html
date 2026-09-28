@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eisenhower Matrix - Mentimeter Clone</title>
+    <title>Eisenhower Matrix - Live Leaderboard</title>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Firebase SDKs -->
@@ -25,7 +25,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // Initial Data Structure for Eisenhower Matrix Tasks
         const initialSlides = [
             { id: 1, title: 'Responding to a customer escalation / Responding to high-priority customer email', votes: [0, 0, 0, 0] },
             { id: 2, title: 'Joining an emergency customer call / Prioritizing customer-facing commitments', votes: [0, 0, 0, 0] },
@@ -64,7 +63,6 @@
             { id: 35, title: 'Attending casual discussions unrelated to work objectives / Watching cricket highlights', votes: [0, 0, 0, 0] }
         ];
 
-        // Seed initial data if empty
         const sessionRef = ref(db, 'session');
         get(sessionRef).then((snapshot) => {
             if (!snapshot.exists()) {
@@ -215,10 +213,11 @@
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
             max-height: 100%;
             overflow-y: auto;
+            gap: 1.5rem;
         }
 
         .slide-title {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: 700;
             margin-bottom: 1.5rem;
             color: var(--text-main);
@@ -245,35 +244,71 @@
             align-items: center;
         }
 
-        .participant-grid {
+        .section-title {
+            font-size: 1rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.4rem;
+            font-weight: bold;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .participant-grid, .leaderboard-list {
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
-            margin-top: 1rem;
+            gap: 0.5rem;
             overflow-y: auto;
+            max-height: 200px;
         }
 
         .participant-chip {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            justify-content: space-between;
             background: #0f172a;
             padding: 0.5rem 0.75rem;
             border-radius: 0.5rem;
             border: 1px solid var(--border);
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 500;
         }
 
+        .participant-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
         .participant-avatar {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             background: #312e81;
-            width: 35px;
-            height: 35px;
+            width: 32px;
+            height: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 50%;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.3rem;
+            font-weight: bold;
+        }
+        .status-voted { background: #065f46; color: #34d399; }
+        .status-pending { background: #78350f; color: #fbbf24; }
+
+        .leaderboard-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0f172a;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            font-size: 0.9rem;
         }
 
         .participant-screen {
@@ -409,11 +444,11 @@
         <div class="mode-card-container">
             <div class="mode-card" onclick="initApp('host')">
                 <h2>🖥️ Host View</h2>
-                <p>Present matrix scenarios, track live quadrant votes, and monitor participants.</p>
+                <p>Present matrix scenarios, track live votes, and view dynamic leaderboards.</p>
             </div>
             <div class="mode-card" onclick="initApp('participant')">
                 <h2>📱 Participant View</h2>
-                <p>Join code #482910, select your avatar, and categorize tasks into 4 quadrants.</p>
+                <p>Join code #482910, select your avatar, and score points based on speed.</p>
             </div>
         </div>
     </div>
@@ -443,9 +478,17 @@
                     </div>
                 </div>
                 <div class="participants-sidebar">
-                    <h3 style="font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;" id="participant-count-header">👥 Participants (0)</h3>
-                    <div class="participant-grid" id="host-participant-list">
-                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1rem;">Waiting for participants...</p>
+                    <div>
+                        <h3 class="section-title" id="participant-count-header">👥 Participants (0)</h3>
+                        <div class="participant-grid" id="host-participant-list">
+                            <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 0.5rem;">Waiting for participants...</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="section-title">🏆 Live Leaderboard</h3>
+                        <div class="leaderboard-list" id="host-leaderboard-list">
+                            <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 0.5rem;">No scores yet</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -474,6 +517,7 @@
         let participantAvatar = '🦊';
         let isRegistered = false;
         let connectedParticipants = {};
+        let slideStartTime = null;
 
         const quadrantLabels = [
             'Q1: Urgent + Important ("DO NOW")',
@@ -494,13 +538,13 @@
                 renderParticipantView();
             }
 
-            // Listen to Firebase Realtime Database updates
             const { db, sessionRef, ref, onValue } = window.dbTools;
             onValue(sessionRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
                     if (currentSlideIndex !== data.currentSlideIndex) {
                         myVoteSubmitted = false;
+                        slideStartTime = data.slideStartTime || Date.now();
                     }
                     currentSlideIndex = data.currentSlideIndex || 0;
                     slides = data.slides || [];
@@ -513,13 +557,13 @@
                 }
             });
 
-            // Listen to Participants in Firebase
             const participantsRef = ref(db, 'participants');
             onValue(participantsRef, (snapshot) => {
                 const data = snapshot.val();
                 connectedParticipants = data || {};
                 if (userRole === 'host') {
                     renderHostParticipants();
+                    renderHostLeaderboard();
                 }
             });
         }
@@ -528,7 +572,6 @@
             const urlParams = new URLSearchParams(window.location.search);
             const mode = urlParams.get('mode');
             if (mode === 'host' || mode === 'participant') {
-                // Wait briefly for dbTools to load from module
                 const checkInterval = setInterval(() => {
                     if (window.dbTools) {
                         clearInterval(checkInterval);
@@ -542,7 +585,8 @@
             const { db, sessionRef, set } = window.dbTools;
             set(sessionRef, {
                 currentSlideIndex: currentSlideIndex,
-                slides: slides
+                slides: slides,
+                slideStartTime: slideStartTime
             });
         }
 
@@ -584,27 +628,66 @@
                     plugins: { legend: { display: false } }
                 }
             });
+            renderHostParticipants();
         }
 
         function renderHostParticipants() {
             const listContainer = document.getElementById('host-participant-list');
-            const entries = Object.values(connectedParticipants);
+            const entries = Object.entries(connectedParticipants);
             document.getElementById('participant-count-header').innerText = `👥 Participants (${entries.length})`;
             
             listContainer.innerHTML = '';
             if (entries.length === 0) {
-                listContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1rem;">Waiting for participants...</p>`;
+                listContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 0.5rem;">Waiting for participants...</p>`;
                 return;
             }
 
-            entries.forEach(p => {
+            entries.forEach(([id, p]) => {
+                const hasVoted = p.votedSlides && p.votedSlides[currentSlideIndex] === true;
                 const chip = document.createElement('div');
                 chip.className = 'participant-chip';
                 chip.innerHTML = `
-                    <div class="participant-avatar">${p.avatar}</div>
-                    <span>${p.name}</span>
+                    <div class="participant-left">
+                        <div class="participant-avatar">${p.avatar}</div>
+                        <span>${p.name}</span>
+                    </div>
+                    <span class="status-badge ${hasVoted ? 'status-voted' : 'status-pending'}">
+                        ${hasVoted ? '✓ Voted' : '⏳ Thinking'}
+                    </span>
                 `;
                 listContainer.appendChild(chip);
+            });
+        }
+
+        function renderHostLeaderboard() {
+            const leaderboardContainer = document.getElementById('host-leaderboard-list');
+            const entries = Object.values(connectedParticipants);
+
+            // Sort participants by total score descending
+            entries.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+            leaderboardContainer.innerHTML = '';
+            if (entries.length === 0 || entries.every(p => !p.score)) {
+                leaderboardContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; text-align: center; margin-top: 0.5rem;">No scores yet</p>`;
+                return;
+            }
+
+            entries.forEach((p, idx) => {
+                const row = document.createElement('div');
+                row.className = 'leaderboard-row';
+                let medal = `#${idx + 1}`;
+                if (idx === 0) medal = '🥇';
+                else if (idx === 1) medal = '🥈';
+                else if (idx === 2) medal = '🥉';
+
+                row.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="font-weight: bold; width: 25px;">${medal}</span>
+                        <span>${p.avatar} ${p.name}</span>
+                    </div>
+                    <span style="font-weight: bold; color: #818cf8;">${p.score || 0} pts</span>
+                `;
+                leaderboardContainer.appendChild(row);
             });
         }
 
@@ -612,6 +695,7 @@
             if (currentSlideIndex < slides.length - 1) {
                 currentSlideIndex++;
                 myVoteSubmitted = false;
+                slideStartTime = Date.now();
                 updateFirebaseState();
             }
         }
@@ -620,6 +704,7 @@
             if (currentSlideIndex > 0) {
                 currentSlideIndex--;
                 myVoteSubmitted = false;
+                slideStartTime = Date.now();
                 updateFirebaseState();
             }
         }
@@ -684,10 +769,55 @@
                 btn.style.whiteSpace = 'pre-line';
                 btn.innerText = q.text;
                 btn.onclick = () => {
+                    const submitTime = Date.now();
                     slide.votes[q.idx]++;
                     myVoteSubmitted = true;
-                    updateFirebaseState();
-                    renderParticipantView();
+                    
+                    // --- DYNAMIC LEADERBOARD SCORING LOGIC ---
+                    const { db, ref, get, set } = window.dbTools;
+                    const userRef = ref(db, 'participants/' + participantId);
+                    
+                    get(userRef).then((snapshot) => {
+                        let userData = snapshot.val() || { score: 0, votedSlides: {} };
+                        let currentScore = userData.score || 0;
+                        let votedSlides = userData.votedSlides || {};
+
+                        if (!votedSlides[currentSlideIndex]) {
+                            votedSlides[currentSlideIndex] = true;
+
+                            // Calculate speed points
+                            const baselineStart = slideStartTime || submitTime;
+                            const timeDiff = submitTime - baselineStart;
+                            
+                            // Check if this user is the very first to answer this slide in Firebase
+                            const slideWinnerRef = ref(db, `slideWinners/${currentSlideIndex}`);
+                            get(slideWinnerRef).then((winnerSnap) => {
+                                let pointsEarned = 5; // default participation points
+                                if (!winnerSnap.exists()) {
+                                    // First place gets 10 points
+                                    set(slideWinnerRef, { time: timeDiff });
+                                    pointsEarned = 10;
+                                } else {
+                                    // Dynamic scaling based on time difference from first answer
+                                    const winnerTime = winnerSnap.val().time;
+                                    const diffFromWinner = timeDiff - winnerTime;
+                                    // Decay over a 10 second window (10000ms), min 2 points
+                                    pointsEarned = Math.max(2, Math.round(10 * (1 - (diffFromWinner / 10000))));
+                                }
+
+                                currentScore += pointsEarned;
+                                set(userRef, {
+                                    name: participantName,
+                                    avatar: participantAvatar,
+                                    score: currentScore,
+                                    votedSlides: votedSlides
+                                });
+
+                                updateFirebaseState();
+                                renderParticipantView();
+                            });
+                        }
+                    });
                 };
                 grid.appendChild(btn);
             });
@@ -712,7 +842,7 @@
 
             const { db, ref, set } = window.dbTools;
             const userRef = ref(db, 'participants/' + participantId);
-            set(userRef, { name: participantName, avatar: participantAvatar });
+            set(userRef, { name: participantName, avatar: participantAvatar, score: 0, votedSlides: {} });
 
             renderParticipantView();
         }
