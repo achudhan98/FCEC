@@ -4,7 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eisenhower Matrix - Mentimeter Clone</title>
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, get, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBWhqJSipVH1ckKyzFOtb_ioC_Mn-ahMcs",
+            authDomain: "fcec-3fa64.firebaseapp.com",
+            databaseURL: "https://fcec-3fa64-default-rtdb.firebaseio.com",
+            projectId: "fcec-3fa64",
+            storageBucket: "fcec-3fa64.firebasestorage.app",
+            messagingSenderId: "994221737980",
+            appId: "1:994221737980:web:3eb0ec831751b422f6d479",
+            measurementId: "G-K3JKKJSF7Z"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Initial Data Structure for Eisenhower Matrix Tasks
+        const initialSlides = [
+            { id: 1, title: 'Responding to a customer escalation / Responding to high-priority customer email', votes: [0, 0, 0, 0] },
+            { id: 2, title: 'Joining an emergency customer call / Prioritizing customer-facing commitments', votes: [0, 0, 0, 0] },
+            { id: 3, title: 'Supporting sales team query during a technical bid evaluation meeting', votes: [0, 0, 0, 0] },
+            { id: 4, title: 'Responding to e-mail from leadership team', votes: [0, 0, 0, 0] },
+            { id: 5, title: 'Addressing shipment delay concerns from logistics team', votes: [0, 0, 0, 0] },
+            { id: 6, title: 'Supporting a teammate during workload crisis', votes: [0, 0, 0, 0] },
+            { id: 7, title: 'Acknowledging project submission delays', votes: [0, 0, 0, 0] },
+            { id: 8, title: 'Supporting new team members during customer escalations', votes: [0, 0, 0, 0] },
+            { id: 9, title: 'Clarifying urgent action items after the meeting / Minutes of meetings', votes: [0, 0, 0, 0] },
+            { id: 10, title: 'Raise NOI for next week’s inspection', votes: [0, 0, 0, 0] },
+            { id: 11, title: 'Supporting factory troubleshooting during critical assembly issues', votes: [0, 0, 0, 0] },
+            { id: 12, title: 'Solving ERP/BOM errors blocking manufacturing activities', votes: [0, 0, 0, 0] },
+            { id: 13, title: 'Arranging urgent dispatch clearance for committed shipments', votes: [0, 0, 0, 0] },
+            { id: 14, title: 'Acting on critical NCRs affecting dispatch approval', votes: [0, 0, 0, 0] },
+            { id: 15, title: 'Improving communication skills / Improving presentation skills / Developing conflict resolution skills', votes: [0, 0, 0, 0] },
+            { id: 16, title: 'Mentoring junior employees', votes: [0, 0, 0, 0] },
+            { id: 17, title: 'Update workload in common share point or Tools', votes: [0, 0, 0, 0] },
+            { id: 18, title: 'Communications from C-suite’s', votes: [0, 0, 0, 0] },
+            { id: 19, title: 'IDP discussion with management', votes: [0, 0, 0, 0] },
+            { id: 20, title: 'Complete assigned LDP courses on Emerson Learn', votes: [0, 0, 0, 0] },
+            { id: 21, title: 'Preparing contents for knowledge-sharing sessions', votes: [0, 0, 0, 0] },
+            { id: 22, title: 'Participating in Transform Initiatives', votes: [0, 0, 0, 0] },
+            { id: 23, title: 'Analyzing past project issues to prevent future recurrence', votes: [0, 0, 0, 0] },
+            { id: 24, title: 'Working on automation ideas for repetitive tasks', votes: [0, 0, 0, 0] },
+            { id: 25, title: 'Scheduling routine meetings', votes: [0, 0, 0, 0] },
+            { id: 26, title: 'Attending meetings where you are an optional invite / minimal contribution', votes: [0, 0, 0, 0] },
+            { id: 27, title: 'Participating in ERG activities', votes: [0, 0, 0, 0] },
+            { id: 28, title: 'Responding instantly for all Teams notification', votes: [0, 0, 0, 0] },
+            { id: 29, title: 'Interruptions from colleagues asking for info already available in shared folders', votes: [0, 0, 0, 0] },
+            { id: 30, title: 'Spending time on cosmetic Excel formatting instead of data accuracy', votes: [0, 0, 0, 0] },
+            { id: 31, title: 'Scrolling LinkedIn feeds without learning or engagement purpose during office hours', votes: [0, 0, 0, 0] },
+            { id: 32, title: 'Spending excessive time on office gossip', votes: [0, 0, 0, 0] },
+            { id: 33, title: 'Repeatedly checking mobile notifications without importance', votes: [0, 0, 0, 0] },
+            { id: 34, title: 'Organizing desktop icons instead of completing tasks', votes: [0, 0, 0, 0] },
+            { id: 35, title: 'Attending casual discussions unrelated to work objectives / Watching cricket highlights', votes: [0, 0, 0, 0] }
+        ];
+
+        // Seed initial data if empty
+        const sessionRef = ref(db, 'session');
+        get(sessionRef).then((snapshot) => {
+            if (!snapshot.exists()) {
+                set(sessionRef, { currentSlideIndex: 0, slides: initialSlides });
+            }
+        });
+
+        window.dbTools = { db, sessionRef, ref, set, onValue, update };
+    </script>
+
     <style>
         :root {
             --primary: #6366f1;
@@ -15,11 +85,10 @@
             --text-muted: #94a3b8;
             --border: #334155;
             
-            /* Quadrant Colors */
-            --q1: #84cc16; /* Olive/Lime Green */
-            --q2: #a855f7; /* Purple */
-            --q3: #f97316; /* Orange */
-            --q4: #14b8a6; /* Teal */
+            --q1: #84cc16; 
+            --q2: #a855f7; 
+            --q3: #f97316; 
+            --q4: #14b8a6; 
         }
 
         * {
@@ -37,7 +106,6 @@
             flex-direction: column;
         }
 
-        /* Landing / Mode Selection */
         #mode-select-screen {
             display: flex;
             flex-direction: column;
@@ -83,7 +151,6 @@
             font-size: 0.95rem;
         }
 
-        /* App Layout */
         .app-container {
             display: none;
             flex: 1;
@@ -119,7 +186,6 @@
             gap: 2rem;
         }
 
-        /* Host Layout Split */
         .host-content {
             display: flex;
             flex: 1;
@@ -152,7 +218,7 @@
         }
 
         .slide-title {
-            font-size: 1.6rem;
+            font-size: 1.5rem;
             font-weight: 700;
             margin-bottom: 1.5rem;
             color: var(--text-main);
@@ -179,7 +245,6 @@
             align-items: center;
         }
 
-        /* Participant Grid Sidebar */
         .participant-grid {
             display: flex;
             flex-direction: column;
@@ -211,7 +276,6 @@
             border-radius: 50%;
         }
 
-        /* Participant View Styles */
         .participant-screen {
             flex-direction: column;
             max-width: 600px;
@@ -263,7 +327,6 @@
             background-color: #047857;
         }
 
-        /* 4 Quadrants Grid Layout for Participants */
         .quadrants-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -314,7 +377,6 @@
             border-color: var(--primary);
         }
 
-        /* Avatar Selection Grid */
         .avatar-picker {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -341,7 +403,6 @@
 </head>
 <body>
 
-    <!-- Landing Screen -->
     <div id="mode-select-screen">
         <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem; color: var(--primary);">Eisenhower Matrix Live Polls</h1>
         <p style="color: var(--text-muted); font-size: 1.1rem;">Choose your mode to start presenting or participating</p>
@@ -357,7 +418,6 @@
         </div>
     </div>
 
-    <!-- Host App Layout -->
     <div id="host-app" class="app-container">
         <header>
             <div style="display: flex; align-items: center; gap: 1rem;">
@@ -385,74 +445,26 @@
                 <div class="participants-sidebar">
                     <h3 style="font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;" id="participant-count-header">👥 Participants (0)</h3>
                     <div class="participant-grid" id="host-participant-list">
-                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1rem;">Waiting for participants to join...</p>
+                        <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1rem;">Waiting for participants...</p>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Participant App Layout -->
     <div id="participant-app" class="app-container">
         <header>
             <h2>Participant View</h2>
             <span class="session-code">#482910</span>
         </header>
         <main style="justify-content: center; align-items: center;">
-            <div class="card" id="participant-card">
-                <!-- Registration / Quadrants Form -->
-            </div>
+            <div class="card" id="participant-card"></div>
         </main>
     </div>
 
     <script>
-        // Generated list of slides covering all provided tasks mapped to the 4 Quadrants
-        const slides = [
-            // --- QUADRANT 1 TASKS ---
-            { id: 1, title: 'Responding to a customer escalation / Responding to high-priority customer email', votes: [0, 0, 0, 0] },
-            { id: 2, title: 'Joining an emergency customer call / Prioritizing customer-facing commitments', votes: [0, 0, 0, 0] },
-            { id: 3, title: 'Supporting sales team query during a technical bid evaluation meeting', votes: [0, 0, 0, 0] },
-            { id: 4, title: 'Responding to e-mail from leadership team', votes: [0, 0, 0, 0] },
-            { id: 5, title: 'Addressing shipment delay concerns from logistics team', votes: [0, 0, 0, 0] },
-            { id: 6, title: 'Supporting a teammate during workload crisis', votes: [0, 0, 0, 0] },
-            { id: 7, title: 'Acknowledging project submission delays', votes: [0, 0, 0, 0] },
-            { id: 8, title: 'Supporting new team members during customer escalations', votes: [0, 0, 0, 0] },
-            { id: 9, title: 'Clarifying urgent action items after the meeting / Minutes of meetings', votes: [0, 0, 0, 0] },
-            { id: 10, title: 'Raise NOI for next week’s inspection', votes: [0, 0, 0, 0] },
-            { id: 11, title: 'Supporting factory troubleshooting during critical assembly issues', votes: [0, 0, 0, 0] },
-            { id: 12, title: 'Solving ERP/BOM errors blocking manufacturing activities', votes: [0, 0, 0, 0] },
-            { id: 13, title: 'Arranging urgent dispatch clearance for committed shipments', votes: [0, 0, 0, 0] },
-            { id: 14, title: 'Acting on critical NCRs affecting dispatch approval', votes: [0, 0, 0, 0] },
-
-            // --- QUADRANT 2 TASKS ---
-            { id: 15, title: 'Improving communication skills / Improving presentation skills / Developing conflict resolution skills', votes: [0, 0, 0, 0] },
-            { id: 16, title: 'Mentoring junior employees', votes: [0, 0, 0, 0] },
-            { id: 17, title: 'Update workload in common share point or Tools', votes: [0, 0, 0, 0] },
-            { id: 18, title: 'Communications from C-suite’s', votes: [0, 0, 0, 0] },
-            { id: 19, title: 'IDP discussion with management', votes: [0, 0, 0, 0] },
-            { id: 20, title: 'Complete assigned LDP courses on Emerson Learn', votes: [0, 0, 0, 0] },
-            { id: 21, title: 'Preparing contents for knowledge-sharing sessions', votes: [0, 0, 0, 0] },
-            { id: 22, title: 'Participating in Transform Initiatives', votes: [0, 0, 0, 0] },
-            { id: 23, title: 'Analyzing past project issues to prevent future recurrence', votes: [0, 0, 0, 0] },
-            { id: 24, title: 'Working on automation ideas for repetitive tasks', votes: [0, 0, 0, 0] },
-
-            // --- QUADRANT 3 TASKS ---
-            { id: 25, title: 'Scheduling routine meetings', votes: [0, 0, 0, 0] },
-            { id: 26, title: 'Attending meetings where you are an optional invite / minimal contribution', votes: [0, 0, 0, 0] },
-            { id: 27, title: 'Participating in ERG activities', votes: [0, 0, 0, 0] },
-            { id: 28, title: 'Responding instantly for all Teams notification', votes: [0, 0, 0, 0] },
-            { id: 29, title: 'Interruptions from colleagues asking for info already available in shared folders', votes: [0, 0, 0, 0] },
-            { id: 30, title: 'Spending time on cosmetic Excel formatting instead of data accuracy', votes: [0, 0, 0, 0] },
-
-            // --- QUADRANT 4 TASKS ---
-            { id: 31, title: 'Scrolling LinkedIn feeds without learning or engagement purpose during office hours', votes: [0, 0, 0, 0] },
-            { id: 32, title: 'Spending excessive time on office gossip', votes: [0, 0, 0, 0] },
-            { id: 33, title: 'Repeatedly checking mobile notifications without importance', votes: [0, 0, 0, 0] },
-            { id: 34, title: 'Organizing desktop icons instead of completing tasks', votes: [0, 0, 0, 0] },
-            { id: 35, title: 'Attending casual discussions unrelated to work objectives / Watching cricket highlights', votes: [0, 0, 0, 0] }
-        ];
-
         let currentSlideIndex = 0;
+        let slides = [];
         let userRole = null;
         let myVoteSubmitted = false;
         let chartInstance = null;
@@ -461,8 +473,6 @@
         let participantName = '';
         let participantAvatar = '🦊';
         let isRegistered = false;
-
-        const channel = new BroadcastChannel('mentimeter_sync_channel');
         let connectedParticipants = {};
 
         const quadrantLabels = [
@@ -471,7 +481,6 @@
             'Q3: Urgent + Not Important ("DELEGATE")',
             'Q4: Not Urgent + Not Important ("ELIMINATE")'
         ];
-
         const quadrantColors = ['#84cc16', '#a855f7', '#f97316', '#14b8a6'];
 
         function initApp(role) {
@@ -480,62 +489,66 @@
             
             if (role === 'host') {
                 document.getElementById('host-app').style.display = 'flex';
-                renderHostSlide();
-                renderHostParticipants();
             } else {
                 document.getElementById('participant-app').style.display = 'flex';
                 renderParticipantView();
             }
+
+            // Listen to Firebase Realtime Database updates
+            const { db, sessionRef, ref, onValue } = window.dbTools;
+            onValue(sessionRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    if (currentSlideIndex !== data.currentSlideIndex) {
+                        myVoteSubmitted = false;
+                    }
+                    currentSlideIndex = data.currentSlideIndex || 0;
+                    slides = data.slides || [];
+
+                    if (userRole === 'host') {
+                        renderHostSlide();
+                    } else if (userRole === 'participant' && isRegistered) {
+                        renderParticipantView();
+                    }
+                }
+            });
+
+            // Listen to Participants in Firebase
+            const participantsRef = ref(db, 'participants');
+            onValue(participantsRef, (snapshot) => {
+                const data = snapshot.val();
+                connectedParticipants = data || {};
+                if (userRole === 'host') {
+                    renderHostParticipants();
+                }
+            });
         }
 
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const mode = urlParams.get('mode');
             if (mode === 'host' || mode === 'participant') {
-                initApp(mode);
+                // Wait briefly for dbTools to load from module
+                const checkInterval = setInterval(() => {
+                    if (window.dbTools) {
+                        clearInterval(checkInterval);
+                        initApp(mode);
+                    }
+                }, 100);
             }
         });
 
-        channel.onmessage = (event) => {
-            const data = event.data;
-            if (data.type === 'STATE_UPDATE') {
-                if (currentSlideIndex !== data.currentSlideIndex) {
-                    myVoteSubmitted = false;
-                }
-                currentSlideIndex = data.currentSlideIndex;
-                slides.splice(0, slides.length, ...data.slides);
-                
-                if (userRole === 'host') renderHostSlide();
-                if (userRole === 'participant' && isRegistered) renderParticipantView();
-            }
-            if (data.type === 'PARTICIPANT_REGISTERED') {
-                connectedParticipants[data.id] = { name: data.name, avatar: data.avatar };
-                if (userRole === 'host') renderHostParticipants();
-                broadcastParticipants();
-            }
-            if (data.type === 'PARTICIPANTS_SYNC' && userRole === 'host') {
-                connectedParticipants = data.participants;
-                renderHostParticipants();
-            }
-        };
-
-        function broadcastState() {
-            channel.postMessage({
-                type: 'STATE_UPDATE',
-                currentSlideIndex,
-                slides
-            });
-        }
-
-        function broadcastParticipants() {
-            channel.postMessage({
-                type: 'PARTICIPANTS_SYNC',
-                participants: connectedParticipants
+        function updateFirebaseState() {
+            const { db, sessionRef, set } = window.dbTools;
+            set(sessionRef, {
+                currentSlideIndex: currentSlideIndex,
+                slides: slides
             });
         }
 
         // --- HOST LOGIC ---
         function renderHostSlide() {
+            if (!slides.length) return;
             const slide = slides[currentSlideIndex];
             document.getElementById('host-slide-title').innerText = `Task: "${slide.title}"`;
             document.getElementById('slide-counter').innerText = `Slide ${currentSlideIndex + 1} of ${slides.length}`;
@@ -580,7 +593,7 @@
             
             listContainer.innerHTML = '';
             if (entries.length === 0) {
-                listContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1rem;">Waiting for participants to join...</p>`;
+                listContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-top: 1rem;">Waiting for participants...</p>`;
                 return;
             }
 
@@ -599,8 +612,7 @@
             if (currentSlideIndex < slides.length - 1) {
                 currentSlideIndex++;
                 myVoteSubmitted = false;
-                renderHostSlide();
-                broadcastState();
+                updateFirebaseState();
             }
         }
 
@@ -608,8 +620,7 @@
             if (currentSlideIndex > 0) {
                 currentSlideIndex--;
                 myVoteSubmitted = false;
-                renderHostSlide();
-                broadcastState();
+                updateFirebaseState();
             }
         }
 
@@ -636,6 +647,11 @@
                     <input type="text" id="participant-name-input" placeholder="e.g. Lalith" />
                     <button class="btn" onclick="registerParticipant()">Join Session</button>
                 `;
+                return;
+            }
+
+            if (!slides.length) {
+                card.innerHTML = `<p style="text-align: center; color: var(--text-muted);">Loading presentation...</p>`;
                 return;
             }
 
@@ -670,7 +686,7 @@
                 btn.onclick = () => {
                     slide.votes[q.idx]++;
                     myVoteSubmitted = true;
-                    broadcastState();
+                    updateFirebaseState();
                     renderParticipantView();
                 };
                 grid.appendChild(btn);
@@ -694,13 +710,9 @@
             participantName = nameInput;
             isRegistered = true;
 
-            connectedParticipants[participantId] = { name: participantName, avatar: participantAvatar };
-            channel.postMessage({
-                type: 'PARTICIPANT_REGISTERED',
-                id: participantId,
-                name: participantName,
-                avatar: participantAvatar
-            });
+            const { db, ref, set } = window.dbTools;
+            const userRef = ref(db, 'participants/' + participantId);
+            set(userRef, { name: participantName, avatar: participantAvatar });
 
             renderParticipantView();
         }
