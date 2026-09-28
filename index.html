@@ -9,7 +9,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, get, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, onValue, get, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBWhqJSipVH1ckKyzFOtb_ioC_Mn-ahMcs",
@@ -66,11 +66,11 @@
         const sessionRef = ref(db, 'session');
         get(sessionRef).then((snapshot) => {
             if (!snapshot.exists()) {
-                set(sessionRef, { currentSlideIndex: 0, slides: initialSlides });
+                set(sessionRef, { currentSlideIndex: 0, slides: initialSlides, slideStartTime: Date.now() });
             }
         });
 
-        window.dbTools = { db, sessionRef, ref, set, onValue, update };
+        window.dbTools = { db, sessionRef, ref, set, onValue, update, get, remove, initialSlides };
     </script>
 
     <style>
@@ -362,6 +362,15 @@
             background-color: #047857;
         }
 
+        .btn-danger {
+            background-color: #b91c1c;
+            width: auto;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #991b1b;
+        }
+
         .quadrants-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -460,6 +469,7 @@
                 <span class="session-code">Join Code: #482910</span>
             </div>
             <div style="display: flex; gap: 1rem; align-items: center;">
+                <button class="btn btn-danger" onclick="resetSession()">🔄 Reset Session</button>
                 <button class="btn btn-success" onclick="exportToCSV()">📥 Download CSV</button>
             </div>
         </header>
@@ -564,6 +574,13 @@
                 if (userRole === 'host') {
                     renderHostParticipants();
                     renderHostLeaderboard();
+                } else if (userRole === 'participant' && isRegistered) {
+                    if (connectedParticipants[participantId] && 
+                        connectedParticipants[participantId].votedSlides && 
+                        connectedParticipants[participantId].votedSlides[currentSlideIndex]) {
+                        myVoteSubmitted = true;
+                        renderParticipantView();
+                    }
                 }
             });
         }
@@ -588,6 +605,28 @@
                 slides: slides,
                 slideStartTime: slideStartTime
             });
+        }
+
+        // --- RESET SESSION FUNCTION ---
+        function resetSession() {
+            if (confirm("Are you sure you want to reset all votes, scores, and slide winners?")) {
+                const { db, ref, set, remove, initialSlides } = window.dbTools;
+                
+                // Reset session state
+                set(ref(db, 'session'), {
+                    currentSlideIndex: 0,
+                    slides: initialSlides,
+                    slideStartTime: Date.now()
+                });
+
+                // Clear participants scores & vote logs
+                remove(ref(db, 'participants'));
+                
+                // Clear slide winners cache
+                remove(ref(db, 'slideWinners'));
+
+                alert("Session has been reset successfully!");
+            }
         }
 
         // --- HOST LOGIC ---
@@ -663,7 +702,6 @@
             const leaderboardContainer = document.getElementById('host-leaderboard-list');
             const entries = Object.values(connectedParticipants);
 
-            // Sort participants by total score descending
             entries.sort((a, b) => (b.score || 0) - (a.score || 0));
 
             leaderboardContainer.innerHTML = '';
@@ -694,7 +732,6 @@
         function nextSlide() {
             if (currentSlideIndex < slides.length - 1) {
                 currentSlideIndex++;
-                myVoteSubmitted = false;
                 slideStartTime = Date.now();
                 updateFirebaseState();
             }
@@ -703,7 +740,6 @@
         function prevSlide() {
             if (currentSlideIndex > 0) {
                 currentSlideIndex--;
-                myVoteSubmitted = false;
                 slideStartTime = Date.now();
                 updateFirebaseState();
             }
@@ -769,14 +805,15 @@
                 btn.style.whiteSpace = 'pre-line';
                 btn.innerText = q.text;
                 btn.onclick = () => {
-                    const submitTime = Date.now();
-                    slide.votes[q.idx]++;
+                    if (myVoteSubmitted) return;
                     myVoteSubmitted = true;
-                    
-                    // --- DYNAMIC LEADERBOARD SCORING LOGIC ---
+                    const submitTime = Date.now();
+
+                    slide.votes[q.idx]++;
+
                     const { db, ref, get, set } = window.dbTools;
                     const userRef = ref(db, 'participants/' + participantId);
-                    
+
                     get(userRef).then((snapshot) => {
                         let userData = snapshot.val() || { score: 0, votedSlides: {} };
                         let currentScore = userData.score || 0;
@@ -785,27 +822,23 @@
                         if (!votedSlides[currentSlideIndex]) {
                             votedSlides[currentSlideIndex] = true;
 
-                            // Calculate speed points
                             const baselineStart = slideStartTime || submitTime;
                             const timeDiff = submitTime - baselineStart;
-                            
-                            // Check if this user is the very first to answer this slide in Firebase
+
                             const slideWinnerRef = ref(db, `slideWinners/${currentSlideIndex}`);
                             get(slideWinnerRef).then((winnerSnap) => {
-                                let pointsEarned = 5; // default participation points
+                                let pointsEarned = 5;
                                 if (!winnerSnap.exists()) {
-                                    // First place gets 10 points
                                     set(slideWinnerRef, { time: timeDiff });
                                     pointsEarned = 10;
                                 } else {
-                                    // Dynamic scaling based on time difference from first answer
                                     const winnerTime = winnerSnap.val().time;
                                     const diffFromWinner = timeDiff - winnerTime;
-                                    // Decay over a 10 second window (10000ms), min 2 points
                                     pointsEarned = Math.max(2, Math.round(10 * (1 - (diffFromWinner / 10000))));
                                 }
 
                                 currentScore += pointsEarned;
+
                                 set(userRef, {
                                     name: participantName,
                                     avatar: participantAvatar,
